@@ -1,10 +1,12 @@
-
 <!DOCTYPE html>
 <html lang="zh-TW">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>工地水準測量計算器</title>
+<title>工地水準測量計算器（含 Excel 匯出）</title>
+
+<!-- SheetJS 用於匯出 Excel -->
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 
 <style>
 body { font-family: Arial; padding: 12px; background:#f4f4f4; }
@@ -20,7 +22,7 @@ button { width:100%; padding:12px; margin-top:8px; font-size:16px; }
 
 <body>
 
-<h2>工地水準測量計算器</h2>
+<h2>工地水準測量計算器（含 Excel 匯出）</h2>
 
 <label>BM1 高程</label>
 <input type="number" id="bm1" step="0.001">
@@ -50,11 +52,12 @@ button { width:100%; padding:12px; margin-top:8px; font-size:16px; }
 <button onclick="addRow()">新增點位</button>
 <button onclick="calculate()">計算</button>
 <button onclick="clearAll()">清空資料</button>
+<button onclick="exportXLSX()">匯出 Excel (.xlsx)</button>
 
 <h3 id="closure"></h3>
 
 <script>
-
+// 新增列
 function addRow(){
     let table=document.querySelector("#dataTable tbody");
     let row=table.insertRow();
@@ -67,6 +70,7 @@ function addRow(){
     `;
 }
 
+// 計算高程
 function calculate(){
     let bm1=parseFloat(document.getElementById("bm1").value);
     let bm1bs=parseFloat(document.getElementById("bm1bs").value);
@@ -99,6 +103,7 @@ function calculate(){
         }
     });
 
+    // 閉合差
     if(!isNaN(bm2)&&rows.length>0){
         let lastRow=rows[rows.length-1];
         let finalElevation=parseFloat(lastRow.cells[4].innerText);
@@ -118,6 +123,7 @@ function calculate(){
     localStorage.setItem("surveyData", document.body.innerHTML);
 }
 
+// 清空資料
 function clearAll(){
     if(confirm("確定清空所有資料？")){
         localStorage.clear();
@@ -125,13 +131,31 @@ function clearAll(){
     }
 }
 
+// 匯出 Excel
+function exportXLSX(){
+    let rows = document.querySelectorAll("#dataTable tbody tr");
+    let data=[["點位","TP","BS","FS","高程"]];
+    rows.forEach(row=>{
+        let point = row.cells[0].querySelector("input").value;
+        let tp = row.cells[1].querySelector("input").checked ? "TP" : "";
+        let bs = row.cells[2].querySelector("input").value;
+        let fs = row.cells[3].querySelector("input").value;
+        let ele = row.cells[4].innerText;
+        data.push([point,tp,bs,fs,ele]);
+    });
+    let ws = XLSX.utils.aoa_to_sheet(data);
+    let wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "沉陷資料");
+    XLSX.writeFile(wb, "水準測量資料.xlsx");
+}
+
+// 讀取 localStorage
 window.onload = function(){
     let data = localStorage.getItem("surveyData");
     if(data){
         document.body.innerHTML = data;
     }
 }
-
 </script>
 
 </body>
