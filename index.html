@@ -23,6 +23,9 @@ button { width:100%; padding:12px; margin-top:8px; font-size:16px; }
 
 <h2>恆億工程水準測量計算器</h2>
 
+<label>工地名稱</label>
+<input type="text" id="siteName" placeholder="輸入工地名稱">
+
 <label>BM1 高程</label>
 <input type="number" id="bm1" step="0.001">
 
@@ -120,6 +123,7 @@ function clearAll(){
 
 // 匯出 Excel
 function exportXLSX(){
+    let siteName = document.getElementById("siteName").value || "水準測量資料";
     let rows=document.querySelectorAll("#dataTable tbody tr");
     let data=[["點位","TP","BS","FS","高程"]];
     rows.forEach(row=>{
@@ -133,7 +137,7 @@ function exportXLSX(){
     let ws=XLSX.utils.aoa_to_sheet(data);
     let wb=XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb,ws,"沉陷資料");
-    XLSX.writeFile(wb,"水準測量資料.xlsx");
+    XLSX.writeFile(wb, siteName + ".xlsx");
 }
 
 // 讀取 localStorage 只恢復表格內容
