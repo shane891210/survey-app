@@ -5,7 +5,6 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>工地水準測量計算器（含 Excel 匯出）</title>
 
-<!-- SheetJS 用於匯出 Excel -->
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 
 <style>
@@ -76,15 +75,10 @@ function calculate(){
     let bm1bs=parseFloat(document.getElementById("bm1bs").value);
     let bm2=parseFloat(document.getElementById("bm2").value);
     let tolerance=parseFloat(document.getElementById("tolerance").value);
-
-    if(isNaN(bm1)||isNaN(bm1bs)){
-        alert("請輸入BM1高程與BS");
-        return;
-    }
+    if(isNaN(bm1)||isNaN(bm1bs)){ alert("請輸入BM1高程與BS"); return; }
 
     let HI=bm1+bm1bs;
     let lastTP=bm1;
-
     let rows=document.querySelectorAll("#dataTable tbody tr");
 
     rows.forEach(row=>{
@@ -92,10 +86,7 @@ function calculate(){
         let bs=parseFloat(row.cells[2].querySelector("input").value);
         let fs=parseFloat(row.cells[3].querySelector("input").value);
 
-        if(!isNaN(bs)){
-            HI=lastTP+bs;
-        }
-
+        if(!isNaN(bs)){ HI=lastTP+bs; }
         if(!isNaN(fs)){
             let elevation=HI-fs;
             row.cells[4].innerText=elevation.toFixed(3);
@@ -103,24 +94,20 @@ function calculate(){
         }
     });
 
-    // 閉合差
     if(!isNaN(bm2)&&rows.length>0){
         let lastRow=rows[rows.length-1];
         let finalElevation=parseFloat(lastRow.cells[4].innerText);
         if(!isNaN(finalElevation)){
             let closure=(finalElevation-bm2)*1000;
             let text="閉合差 = "+closure.toFixed(1)+" mm";
-            if(Math.abs(closure)>tolerance){
-                text+=" ⚠ 超過容許值";
-                document.getElementById("closure").className="warning";
-            }else{
-                document.getElementById("closure").className="";
-            }
+            if(Math.abs(closure)>tolerance){ text+=" ⚠ 超過容許值"; document.getElementById("closure").className="warning"; }
+            else{ document.getElementById("closure").className=""; }
             document.getElementById("closure").innerText=text;
         }
     }
 
-    localStorage.setItem("surveyData", document.body.innerHTML);
+    // 只存表格內容
+    localStorage.setItem("surveyDataTable", document.querySelector("#dataTable tbody").innerHTML);
 }
 
 // 清空資料
@@ -133,28 +120,26 @@ function clearAll(){
 
 // 匯出 Excel
 function exportXLSX(){
-    let rows = document.querySelectorAll("#dataTable tbody tr");
+    let rows=document.querySelectorAll("#dataTable tbody tr");
     let data=[["點位","TP","BS","FS","高程"]];
     rows.forEach(row=>{
-        let point = row.cells[0].querySelector("input").value;
-        let tp = row.cells[1].querySelector("input").checked ? "TP" : "";
-        let bs = row.cells[2].querySelector("input").value;
-        let fs = row.cells[3].querySelector("input").value;
-        let ele = row.cells[4].innerText;
+        let point=row.cells[0].querySelector("input").value;
+        let tp=row.cells[1].querySelector("input").checked?"TP":"";
+        let bs=row.cells[2].querySelector("input").value;
+        let fs=row.cells[3].querySelector("input").value;
+        let ele=row.cells[4].innerText;
         data.push([point,tp,bs,fs,ele]);
     });
-    let ws = XLSX.utils.aoa_to_sheet(data);
-    let wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "沉陷資料");
-    XLSX.writeFile(wb, "水準測量資料.xlsx");
+    let ws=XLSX.utils.aoa_to_sheet(data);
+    let wb=XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb,ws,"沉陷資料");
+    XLSX.writeFile(wb,"水準測量資料.xlsx");
 }
 
-// 讀取 localStorage
-window.onload = function(){
-    let data = localStorage.getItem("surveyData");
-    if(data){
-        document.body.innerHTML = data;
-    }
+// 讀取 localStorage 只恢復表格內容
+window.onload=function(){
+    let data=localStorage.getItem("surveyDataTable");
+    if(data){ document.querySelector("#dataTable tbody").innerHTML=data; }
 }
 </script>
 
