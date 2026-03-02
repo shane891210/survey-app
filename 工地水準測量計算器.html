@@ -1,0 +1,138 @@
+
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>工地水準測量計算器</title>
+
+<style>
+body { font-family: Arial; padding: 12px; background:#f4f4f4; }
+h2 { text-align:center; }
+input { width:100%; padding:8px; margin:4px 0; font-size:16px; }
+table { width:100%; border-collapse: collapse; margin-top:10px; background:white;}
+th, td { border:1px solid #ccc; padding:6px; text-align:center; font-size:14px; }
+button { width:100%; padding:12px; margin-top:8px; font-size:16px; }
+.result { background:#eef; font-weight:bold; }
+.warning { color:red; font-weight:bold; }
+</style>
+</head>
+
+<body>
+
+<h2>工地水準測量計算器</h2>
+
+<label>BM1 高程</label>
+<input type="number" id="bm1" step="0.001">
+
+<label>BM1 BS</label>
+<input type="number" id="bm1bs" step="0.001">
+
+<label>BM2 高程（選填）</label>
+<input type="number" id="bm2" step="0.001">
+
+<label>容許閉合差 (mm)</label>
+<input type="number" id="tolerance" value="10">
+
+<table id="dataTable">
+<thead>
+<tr>
+<th>點位</th>
+<th>TP</th>
+<th>BS</th>
+<th>FS</th>
+<th>高程</th>
+</tr>
+</thead>
+<tbody></tbody>
+</table>
+
+<button onclick="addRow()">新增點位</button>
+<button onclick="calculate()">計算</button>
+<button onclick="clearAll()">清空資料</button>
+
+<h3 id="closure"></h3>
+
+<script>
+
+function addRow(){
+    let table=document.querySelector("#dataTable tbody");
+    let row=table.insertRow();
+    row.innerHTML=`
+        <td><input></td>
+        <td><input type="checkbox"></td>
+        <td><input type="number" step="0.001"></td>
+        <td><input type="number" step="0.001"></td>
+        <td class="result"></td>
+    `;
+}
+
+function calculate(){
+    let bm1=parseFloat(document.getElementById("bm1").value);
+    let bm1bs=parseFloat(document.getElementById("bm1bs").value);
+    let bm2=parseFloat(document.getElementById("bm2").value);
+    let tolerance=parseFloat(document.getElementById("tolerance").value);
+
+    if(isNaN(bm1)||isNaN(bm1bs)){
+        alert("請輸入BM1高程與BS");
+        return;
+    }
+
+    let HI=bm1+bm1bs;
+    let lastTP=bm1;
+
+    let rows=document.querySelectorAll("#dataTable tbody tr");
+
+    rows.forEach(row=>{
+        let isTP=row.cells[1].querySelector("input").checked;
+        let bs=parseFloat(row.cells[2].querySelector("input").value);
+        let fs=parseFloat(row.cells[3].querySelector("input").value);
+
+        if(!isNaN(bs)){
+            HI=lastTP+bs;
+        }
+
+        if(!isNaN(fs)){
+            let elevation=HI-fs;
+            row.cells[4].innerText=elevation.toFixed(3);
+            if(isTP){ lastTP=elevation; }
+        }
+    });
+
+    if(!isNaN(bm2)&&rows.length>0){
+        let lastRow=rows[rows.length-1];
+        let finalElevation=parseFloat(lastRow.cells[4].innerText);
+        if(!isNaN(finalElevation)){
+            let closure=(finalElevation-bm2)*1000;
+            let text="閉合差 = "+closure.toFixed(1)+" mm";
+            if(Math.abs(closure)>tolerance){
+                text+=" ⚠ 超過容許值";
+                document.getElementById("closure").className="warning";
+            }else{
+                document.getElementById("closure").className="";
+            }
+            document.getElementById("closure").innerText=text;
+        }
+    }
+
+    localStorage.setItem("surveyData", document.body.innerHTML);
+}
+
+function clearAll(){
+    if(confirm("確定清空所有資料？")){
+        localStorage.clear();
+        location.reload();
+    }
+}
+
+window.onload = function(){
+    let data = localStorage.getItem("surveyData");
+    if(data){
+        document.body.innerHTML = data;
+    }
+}
+
+</script>
+
+</body>
+</html>
