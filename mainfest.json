@@ -1,0 +1,9 @@
+{
+  "name": "工地水準測量計算器",
+  "short_name": "水準計算器",
+  "start_url": "index.html",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#1976d2",
+  "icons": []
+}
