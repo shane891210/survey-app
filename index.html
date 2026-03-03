@@ -270,6 +270,278 @@ window.addEventListener("load",()=>{
 });
 
 // Excel 匯出自動加「水準測量」
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>恆億工程水準測量計算器</title>
+<link rel="manifest" href="manifest.json">
+<script>
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('service-worker.js');
+}
+</script>
+<meta name="theme-color" content="#1976d2">
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+
+<style>
+body { font-family: Arial; padding: 12px; background:#f4f4f4; }
+h2 { text-align:center; }
+input, select { width:100%; padding:10px; margin:6px 0; font-size:18px; }
+table { width:100%; border-collapse: collapse; margin-top:10px; background:white;}
+th, td { border:1px solid #ccc; padding:8px; text-align:center; font-size:16px; }
+button.main-btn { width:100%; padding:14px; margin-top:8px; font-size:18px; }
+.result { background:#eef; font-weight:bold; }
+.warning { color:red; font-weight:bold; }
+.sort-btn { font-size:14px; padding:2px 5px; margin-left:4px; }
+</style>
+</head>
+
+<body>
+
+<h2>恆億工程水準測量計算器</h2>
+
+<label>測線模式</label>
+<select id="mode" onchange="saveEnhancedData()">
+<option value="closed">閉合水準（BM→BM）</option>
+<option value="attach">附合水準（未知→BM）</option>
+<option value="relative">相對高程（無BM）</option>
+</select>
+
+<label>工地名稱</label>
+<input type="text" id="siteName" placeholder="輸入工地名稱" oninput="saveEnhancedData()">
+
+<label>起始高程</label>
+<input type="text" inputmode="decimal" pattern="[0-9]*" id="bm1" oninput="saveEnhancedData()">
+
+<label>起始BS</label>
+<input type="text" inputmode="decimal" pattern="[0-9]*" id="bm1bs" oninput="saveEnhancedData()">
+
+<label>終點BM高程（若有）</label>
+<input type="text" inputmode="decimal" pattern="[0-9]*" id="bm2" oninput="saveEnhancedData()">
+
+<label>容許閉合差 (mm)</label>
+<input type="text" inputmode="decimal" pattern="[0-9]*" id="tolerance" value="10" oninput="saveEnhancedData()">
+
+<table id="dataTable">
+<thead>
+<tr>
+<th>點位</th><th>TP</th><th>BS</th><th>FS</th><th>高程</th>
+</tr>
+</thead>
+<tbody></tbody>
+</table>
+
+<button class="main-btn" onclick="addRow()">新增點位</button>
+<button class="main-btn" onclick="calculate()">計算</button>
+<button class="main-btn" onclick="exportXLSX()">匯出 Excel</button>
+<button class="main-btn" onclick="showHelp()">使用教學</button>
+<button class="main-btn" onclick="clearAll()">清空資料</button>
+
+<h3 id="closure"></h3>
+
+<script>
+// ======================
+// 基本功能
+// ======================
+
+// 新增列
+function addRow(){
+    let row=document.querySelector("#dataTable tbody").insertRow();
+    row.innerHTML=`
+        <td><input oninput="saveEnhancedData()"></td>
+        <td><input type="checkbox" onchange="saveEnhancedData()"></td>
+        <td><input type="text" inputmode="decimal" pattern="[0-9]*" oninput="saveEnhancedData()"></td>
+        <td><input type="text" inputmode="decimal" pattern="[0-9]*" oninput="saveEnhancedData()"></td>
+        <td></td>`;
+    saveEnhancedData();
+}
+
+// 計算
+function calculate(){
+    let mode=document.getElementById("mode").value;
+    let bm1=parseFloat(document.getElementById("bm1").value);
+    let bm1bs=parseFloat(document.getElementById("bm1bs").value);
+    let bm2=parseFloat(document.getElementById("bm2").value);
+    let tolerance=parseFloat(document.getElementById("tolerance").value);
+
+    if(isNaN(bm1)||isNaN(bm1bs)){ alert("請輸入起始高程與BS"); return; }
+
+    let HI=bm1+bm1bs;
+    let lastTP=bm1;
+    let sumBS=bm1bs;
+    let sumFS=0;
+    let rows=document.querySelectorAll("#dataTable tbody tr");
+
+    rows.forEach(row=>{
+        let isTP=row.cells[1].querySelector("input").checked;
+        let bs=parseFloat(row.cells[2].querySelector("input").value);
+        let fs=parseFloat(row.cells[3].querySelector("input").value);
+
+        if(!isNaN(bs)){
+            HI=lastTP+bs;
+            sumBS+=bs;
+        }
+        if(!isNaN(fs)){
+            let elevation=HI-fs;
+            row.cells[4].innerText=elevation.toFixed(4);
+            sumFS+=fs;
+            if(isTP){ lastTP=elevation; }
+        }
+    });
+
+    if(mode!="relative" && !isNaN(bm2)){
+        let closure=(sumBS-sumFS)-(bm2-bm1);
+        let text="ΣBS="+sumBS.toFixed(4)+"  ΣFS="+sumFS.toFixed(4);
+        text+="  閉合差="+(closure*1000).toFixed(1)+" mm";
+
+        if(Math.abs(closure*1000)>tolerance){
+            text+=" ⚠ 超過容許值";
+            document.getElementById("closure").className="warning";
+        } else {
+            document.getElementById("closure").className="";
+        }
+        document.getElementById("closure").innerText=text;
+    }
+    saveEnhancedData();
+}
+
+// 教學
+function showHelp(){
+    alert(`使用教學：
+
+1️⃣ 閉合水準：
+   已知BM → 測點 → 回到已知BM
+   系統會計算 ΣBS、ΣFS 與閉合差。
+
+2️⃣ 附合水準：
+   起點填假設高程，最後輸入已知BM，
+   系統會檢核閉合差。
+
+3️⃣ 相對高程：
+   不需BM，只計算各點高程。
+
+操作流程：
+輸入起始高程與BS → 新增點位 → 填FS（若該點為TP勾選） → 計算
+系統會自動儲存資料，關閉頁面不會消失。`);
+}
+
+// ======================
+// 附加功能：保持資料 + 點位排序 + Excel檔名自動加字
+// ======================
+
+let originalOrder = [];
+let sortedAsc = false;
+
+function saveEnhancedData(){
+    let rows=document.querySelectorAll("#dataTable tbody tr");
+    let data=[];
+    rows.forEach(row=>{
+        data.push([
+            row.cells[0].querySelector("input").value,
+            row.cells[1].querySelector("input").checked,
+            row.cells[2].querySelector("input").value,
+            row.cells[3].querySelector("input").value,
+            row.cells[4].innerText
+        ]);
+    });
+    localStorage.setItem("surveyTable", JSON.stringify(data));
+
+    ["bm1","bm1bs","bm2","tolerance","siteName","mode"].forEach(id=>{
+        let el=document.getElementById(id);
+        if(el) localStorage.setItem(id, el.value);
+    });
+}
+
+function loadEnhancedData(){
+    let tableData = localStorage.getItem("surveyTable");
+    if(tableData){
+        let rows = JSON.parse(tableData);
+        let tbody=document.querySelector("#dataTable tbody");
+        tbody.innerHTML="";
+        rows.forEach(r=>{
+            let row = tbody.insertRow();
+            row.innerHTML=`
+                <td><input value="${r[0]}" oninput="saveEnhancedData()"></td>
+                <td><input type="checkbox" ${r[1] ? "checked" : ""} onchange="saveEnhancedData()"></td>
+                <td><input type="text" inputmode="decimal" pattern="[0-9]*" value="${r[2]}" oninput="saveEnhancedData()"></td>
+                <td><input type="text" inputmode="decimal" pattern="[0-9]*" value="${r[3]}" oninput="saveEnhancedData()"></td>
+                <td>${r[4]}</td>`;
+        });
+    }
+
+    ["bm1","bm1bs","bm2","tolerance","siteName","mode"].forEach(id=>{
+        let val=localStorage.getItem(id);
+        if(val!==null) document.getElementById(id).value=val;
+    });
+}
+
+// 點位排序函式
+function sortPoints(){
+    let tbody = document.querySelector("#dataTable tbody");
+
+    if(!originalOrder.length){
+        originalOrder = Array.from(tbody.querySelectorAll("tr")).map(row => row.cloneNode(true));
+    }
+
+    if(sortedAsc){
+        tbody.innerHTML="";
+        originalOrder.forEach(row => tbody.appendChild(row.cloneNode(true)));
+        sortedAsc=false;
+    } else {
+        let rows = Array.from(tbody.querySelectorAll("tr"));
+        rows.sort((a,b)=>{
+            let pa=a.cells[0].querySelector("input").value.toUpperCase();
+            let pb=b.cells[0].querySelector("input").value.toUpperCase();
+            let matchA=pa.match(/^(\d+)?([A-Z]+)?-?(\d+)?$/);
+            let matchB=pb.match(/^(\d+)?([A-Z]+)?-?(\d+)?$/);
+            let numA=matchA[1]?parseInt(matchA[1]):0;
+            let secA=matchA[2]||pa;
+            let sufA=matchA[3]?parseInt(matchA[3]):0;
+            let numB=matchB[1]?parseInt(matchB[1]):0;
+            let secB=matchB[2]||pb;
+            let sufB=matchB[3]?parseInt(matchB[3]):0;
+            if(numA!==numB) return numA-numB;
+            if(secA!==secB) return secA.localeCompare(secB);
+            return sufA-sufB;
+        });
+        let frag=document.createDocumentFragment();
+        rows.forEach(row=>{
+            let newRow=row.cloneNode(true);
+            newRow.cells[0].querySelector("input").oninput=saveEnhancedData;
+            newRow.cells[1].querySelector("input").onchange=saveEnhancedData;
+            newRow.cells[2].querySelector("input").oninput=saveEnhancedData;
+            newRow.cells[3].querySelector("input").oninput=saveEnhancedData;
+            frag.appendChild(newRow);
+        });
+        tbody.innerHTML="";
+        tbody.appendChild(frag);
+        sortedAsc=true;
+    }
+    saveEnhancedData();
+
+    // 更新箭頭
+    let btn=document.getElementById("sortBtnEnhanced");
+    if(btn) btn.innerHTML=sortedAsc?"&#9660;":"&#9650;";
+}
+
+// 綁定排序按鈕
+window.addEventListener("load",()=>{
+    loadEnhancedData();
+
+    let th = document.querySelector("#dataTable thead tr th:first-child");
+    if(th && !document.getElementById("sortBtnEnhanced")){
+        let btn=document.createElement("button");
+        btn.id="sortBtnEnhanced";
+        btn.className="sort-btn";
+        btn.innerHTML="&#9650;"; // 初始箭頭
+        btn.onclick=sortPoints;
+        th.appendChild(btn);
+    }
+});
+
+// Excel 匯出自動加「水準測量」
 let originalExport = exportXLSX;
 exportXLSX = function(){
     let site=document.getElementById("siteName").value||"工地";
@@ -289,6 +561,17 @@ exportXLSX = function(){
     XLSX.utils.book_append_sheet(wb,ws,"資料");
     XLSX.writeFile(wb, site+" 水準測量.xlsx");
 }
+
+// 清空
+function clearAll(){
+    if(confirm("確定清空所有資料？")){
+        localStorage.clear();
+        location.reload();
+    }
+}
+</script>
+</body>
+</html>
 
 // 清空
 function clearAll(){
