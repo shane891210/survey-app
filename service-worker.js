@@ -5,6 +5,8 @@ self.addEventListener("install", event => {
       return cache.addAll([
         "index.html",
         "manifest.json",
+        "icon-192.png",
+        "icon-512.png",
         "https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"
       ]);
     })
