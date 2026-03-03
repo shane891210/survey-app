@@ -200,7 +200,148 @@ function clearAll(){
         location.reload();
     }
 }
+<script>
+// ======================
+// 附加功能：保持資料 + 點位排序 + Excel檔名自動加字
+// ======================
+
+let originalOrder = [];
+let sortedAsc = false;
+
+// 儲存 table 與必要欄位
+function saveEnhancedData(){
+    let rows=document.querySelectorAll("#dataTable tbody tr");
+    let data=[];
+    rows.forEach(row=>{
+        data.push([
+            row.cells[0].querySelector("input").value,
+            row.cells[1].querySelector("input").checked,
+            row.cells[2].querySelector("input").value,
+            row.cells[3].querySelector("input").value,
+            row.cells[4].innerText
+        ]);
+    });
+    localStorage.setItem("surveyTable", JSON.stringify(data));
+
+    // 其他欄位
+    ["bm1","bm1bs","bm2","tolerance","siteName","mode"].forEach(id=>{
+        let el=document.getElementById(id);
+        if(el) localStorage.setItem(id, el.value);
+    });
+}
+
+// 還原資料
+function loadEnhancedData(){
+    let tableData = localStorage.getItem("surveyTable");
+    if(tableData){
+        let rows = JSON.parse(tableData);
+        let tbody=document.querySelector("#dataTable tbody");
+        tbody.innerHTML="";
+        rows.forEach(r=>{
+            let row = tbody.insertRow();
+            row.innerHTML=`
+                <td><input value="${r[0]}" oninput="saveEnhancedData()"></td>
+                <td><input type="checkbox" ${r[1] ? "checked" : ""} onchange="saveEnhancedData()"></td>
+                <td><input type="text" inputmode="decimal" pattern="[0-9]*" value="${r[2]}" oninput="saveEnhancedData()"></td>
+                <td><input type="text" inputmode="decimal" pattern="[0-9]*" value="${r[3]}" oninput="saveEnhancedData()"></td>
+                <td>${r[4]}</td>`;
+        });
+    }
+
+    // 還原其他欄位
+    ["bm1","bm1bs","bm2","tolerance","siteName","mode"].forEach(id=>{
+        let val=localStorage.getItem(id);
+        if(val!==null) document.getElementById(id).value=val;
+    });
+}
+
+// 點位排序
+function saveOriginalOrder(){
+    originalOrder = Array.from(document.querySelectorAll("#dataTable tbody tr"))
+        .map(row => row.cloneNode(true));
+}
+
+function sortPoints(){
+    let tbody = document.querySelector("#dataTable tbody");
+
+    if(!originalOrder.length){
+        originalOrder = Array.from(tbody.querySelectorAll("tr"))
+            .map(row => row.cloneNode(true));
+    }
+
+    if(sortedAsc){ // 回到原始輸入順序
+        tbody.innerHTML = "";
+        originalOrder.forEach(row => tbody.appendChild(row));
+        sortedAsc = false;
+    } else { // 排序
+        let rows = Array.from(tbody.querySelectorAll("tr"));
+        rows.sort((a, b) => {
+            let pa = a.cells[0].querySelector("input").value.toUpperCase();
+            let pb = b.cells[0].querySelector("input").value.toUpperCase();
+
+            let matchA = pa.match(/^(\d+)?([A-Z]+)?-?(\d+)?$/);
+            let matchB = pb.match(/^(\d+)?([A-Z]+)?-?(\d+)?$/);
+
+            // 整合邏輯：數字區域 -> 字母區域 -> 後綴數字
+            let numA = matchA[1] ? parseInt(matchA[1]) : 0;
+            let secA = matchA[2] || pa; // 沒有字母的就用整串字母排序
+            let suffixA = matchA[3] ? parseInt(matchA[3]) : 0;
+
+            let numB = matchB[1] ? parseInt(matchB[1]) : 0;
+            let secB = matchB[2] || pb;
+            let suffixB = matchB[3] ? parseInt(matchB[3]) : 0;
+
+            if(numA !== numB) return numA - numB;
+            if(secA !== secB) return secA.localeCompare(secB);
+            return suffixA - suffixB;
+        });
+
+        tbody.innerHTML = "";
+        rows.forEach(row => tbody.appendChild(row));
+        sortedAsc = true;
+    }
+
+    // 排序後同步儲存
+    saveEnhancedData();
+}
+
+// 重新綁定排序按鈕
+window.addEventListener("load",()=>{
+    loadEnhancedData();
+    // 在表格標題加排序按鈕
+    let th = document.querySelector("#dataTable thead tr th:first-child");
+    if(th && !document.getElementById("sortBtnEnhanced")){
+        let btn = document.createElement("button");
+        btn.id="sortBtnEnhanced";
+        btn.textContent="排序";
+        btn.style.marginLeft="4px";
+        btn.onclick=sortPoints;
+        th.appendChild(btn);
+    }
+});
+
+// Excel 匯出自動加「水準測量」
+let originalExport = exportXLSX;
+exportXLSX = function(){
+    let site=document.getElementById("siteName").value||"工地";
+    let rows=document.querySelectorAll("#dataTable tbody tr");
+    let data=[["點位","TP","BS","FS","高程"]];
+    rows.forEach(row=>{
+        data.push([
+            row.cells[0].querySelector("input").value,
+            row.cells[1].querySelector("input").checked?"TP":"",
+            row.cells[2].querySelector("input").value,
+            row.cells[3].querySelector("input").value,
+            row.cells[4].innerText
+        ]);
+    });
+    let ws=XLSX.utils.aoa_to_sheet(data);
+    let wb=XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb,ws,"資料");
+    XLSX.writeFile(wb, site+" 水準測量.xlsx");
+}
 </script>
+  
 
 </body>
 </html>
