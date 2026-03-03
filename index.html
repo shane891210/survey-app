@@ -113,7 +113,7 @@ function calculate(){
         }
         if(!isNaN(fs)){
             let elevation=HI-fs;
-            row.cells[4].innerText=elevation.toFixed(3);
+            row.cells[4].innerText=elevation.toFixed(4);
             sumFS+=fs;
             if(isTP){ lastTP=elevation; }
         }
@@ -122,7 +122,7 @@ function calculate(){
     if(mode!="relative" && !isNaN(bm2)){
         let closure=(sumBS-sumFS)-(bm2-bm1);
         let text="ΣBS="+sumBS.toFixed(3)+"  ΣFS="+sumFS.toFixed(3);
-        text+="  閉合差="+(closure*1000).toFixed(1)+" mm";
+        text+="  閉合差="+(closure*1000).toFixed(2)+" mm";
 
         if(Math.abs(closure*1000)>tolerance){
             text+=" ⚠ 超過容許值";
