@@ -262,46 +262,43 @@ function saveOriginalOrder(){
 }
 
 function sortPoints(){
-    let tbody = document.querySelector("#dataTable tbody");
+    let tbody=document.querySelector("#dataTable tbody");
 
     if(!originalOrder.length){
         originalOrder = Array.from(tbody.querySelectorAll("tr"))
             .map(row => row.cloneNode(true));
     }
 
-    if(sortedAsc){ // 回到原始輸入順序
+    if(sortedAsc){ 
         tbody.innerHTML = "";
-        originalOrder.forEach(row => tbody.appendChild(row));
-        sortedAsc = false;
-    } else { // 排序
+        originalOrder.forEach(row => tbody.appendChild(row.cloneNode(true)));
+        sortedAsc=false;
+    } else { 
         let rows = Array.from(tbody.querySelectorAll("tr"));
         rows.sort((a, b) => {
             let pa = a.cells[0].querySelector("input").value.toUpperCase();
             let pb = b.cells[0].querySelector("input").value.toUpperCase();
-
             let matchA = pa.match(/^(\d+)?([A-Z]+)?-?(\d+)?$/);
             let matchB = pb.match(/^(\d+)?([A-Z]+)?-?(\d+)?$/);
-
-            // 整合邏輯：數字區域 -> 字母區域 -> 後綴數字
             let numA = matchA[1] ? parseInt(matchA[1]) : 0;
-            let secA = matchA[2] || pa; // 沒有字母的就用整串字母排序
+            let secA = matchA[2] || pa;
             let suffixA = matchA[3] ? parseInt(matchA[3]) : 0;
-
             let numB = matchB[1] ? parseInt(matchB[1]) : 0;
             let secB = matchB[2] || pb;
             let suffixB = matchB[3] ? parseInt(matchB[3]) : 0;
-
-            if(numA !== numB) return numA - numB;
-            if(secA !== secB) return secA.localeCompare(secB);
-            return suffixA - suffixB;
+            if(numA!==numB) return numA-numB;
+            if(secA!==secB) return secA.localeCompare(secB);
+            return suffixA-suffixB;
         });
 
+        // 先 clone 再 append，不破壞原事件
+        let frag=document.createDocumentFragment();
+        rows.forEach(row=>frag.appendChild(row.cloneNode(true)));
         tbody.innerHTML = "";
-        rows.forEach(row => tbody.appendChild(row));
-        sortedAsc = true;
+        tbody.appendChild(frag);
+        sortedAsc=true;
     }
 
-    // 排序後同步儲存
     saveEnhancedData();
 }
 
