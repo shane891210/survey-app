@@ -5,85 +5,86 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>恆億工程水準測量計算器</title>
 <link rel="manifest" href="manifest.json">
-<script>
-if ('serviceWorker' in navigator) {
-  navigator.serviceWorker.register('service-worker.js');
-}
-</script>
-<meta name="theme-color" content="#1976d2">
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
-
+<meta name="theme-color" content="#1976d2">
 <style>
 body { font-family: Arial; padding: 12px; background:#f4f4f4; }
 h2 { text-align:center; }
 input, select { width:100%; padding:10px; margin:6px 0; font-size:18px; }
 table { width:100%; border-collapse: collapse; margin-top:10px; background:white;}
 th, td { border:1px solid #ccc; padding:8px; text-align:center; font-size:16px; }
-button { width:100%; padding:14px; margin-top:8px; font-size:18px; }
+button { padding:4px 8px; font-size:14px; margin-left:4px; }
+.button-main { width:100%; padding:14px; font-size:18px; margin-top:8px; }
 .result { background:#eef; font-weight:bold; }
 .warning { color:red; font-weight:bold; }
 </style>
 </head>
-
 <body>
 
 <h2>恆億工程水準測量計算器</h2>
 
 <label>測線模式</label>
-<select id="mode" onchange="saveData()">
+<select id="mode">
 <option value="closed">閉合水準（BM→BM）</option>
 <option value="attach">附合水準（未知→BM）</option>
 <option value="relative">相對高程（無BM）</option>
 </select>
 
 <label>工地名稱</label>
-<input type="text" id="siteName" placeholder="輸入工地名稱" oninput="saveData()">
+<input type="text" id="siteName" placeholder="輸入工地名稱">
 
 <label>起始高程</label>
-<input type="text" inputmode="decimal" pattern="[0-9]*" id="bm1" oninput="saveData()">
+<input type="text" inputmode="decimal" id="bm1">
 
 <label>起始BS</label>
-<input type="text" inputmode="decimal" pattern="[0-9]*" id="bm1bs" oninput="saveData()">
+<input type="text" inputmode="decimal" id="bm1bs">
 
 <label>終點BM高程（若有）</label>
-<input type="text" inputmode="decimal" pattern="[0-9]*" id="bm2" oninput="saveData()">
+<input type="text" inputmode="decimal" id="bm2">
 
 <label>容許閉合差 (mm)</label>
-<input type="text" inputmode="decimal" pattern="[0-9]*" id="tolerance" value="10" oninput="saveData()">
+<input type="text" inputmode="decimal" id="tolerance" value="10">
 
 <table id="dataTable">
 <thead>
 <tr>
-<th>點位</th><th>TP</th><th>BS</th><th>FS</th><th>高程</th>
+<th>點位 <button id="sortBtn">&#9650;</button></th><th>TP</th><th>BS</th><th>FS</th><th>高程</th>
 </tr>
 </thead>
 <tbody></tbody>
 </table>
 
-<button onclick="addRow()">新增點位</button>
-<button onclick="calculate()">計算</button>
-<button onclick="exportXLSX()">匯出 Excel</button>
-<button onclick="showHelp()">使用教學</button>
-<button onclick="clearAll()">清空資料</button>
+<button class="button-main" id="addRowBtn">新增點位</button>
+<button class="button-main" id="calculateBtn">計算</button>
+<button class="button-main" id="exportBtn">匯出 Excel</button>
+<button class="button-main" id="helpBtn">使用教學</button>
+<button class="button-main" id="clearBtn">清空資料</button>
 
 <h3 id="closure"></h3>
 
 <script>
-// 註冊 service worker
+// ======================
+// 核心功能
+// ======================
+
 if ('serviceWorker' in navigator) {
   navigator.serviceWorker.register('service-worker.js');
 }
 
+let sortedAsc = true;
+let originalOrder = [];
+
 // 新增列
 function addRow(){
-    let row=document.querySelector("#dataTable tbody").insertRow();
+    let tbody = document.querySelector("#dataTable tbody");
+    let row = tbody.insertRow();
     row.innerHTML=`
-    <td><input oninput="saveData()"></td>
-    <td><input type="checkbox" onchange="saveData()"></td>
-    <td><input type="text" inputmode="decimal" pattern="[0-9]*" oninput="saveData()"></td>
-    <td><input type="text" inputmode="decimal" pattern="[0-9]*" oninput="saveData()"></td>
-    <td></td>`;
-    saveData();
+        <td><input></td>
+        <td><input type="checkbox"></td>
+        <td><input type="text" inputmode="decimal"></td>
+        <td><input type="text" inputmode="decimal"></td>
+        <td></td>`;
+    saveEnhancedData();
 }
 
 // 計算
@@ -113,7 +114,7 @@ function calculate(){
         }
         if(!isNaN(fs)){
             let elevation=HI-fs;
-            row.cells[4].innerText=elevation.toFixed(4);
+            row.cells[4].innerText=elevation.toFixed(1);
             sumFS+=fs;
             if(isTP){ lastTP=elevation; }
         }
@@ -121,8 +122,8 @@ function calculate(){
 
     if(mode!="relative" && !isNaN(bm2)){
         let closure=(sumBS-sumFS)-(bm2-bm1);
-        let text="ΣBS="+sumBS.toFixed(3)+"  ΣFS="+sumFS.toFixed(3);
-        text+="  閉合差="+(closure*1000).toFixed(2)+" mm";
+        let text="ΣBS="+sumBS.toFixed(1)+"  ΣFS="+sumFS.toFixed(1);
+        text+="  閉合差="+(closure*1000).toFixed(1)+" mm";
 
         if(Math.abs(closure*1000)>tolerance){
             text+=" ⚠ 超過容許值";
@@ -132,249 +133,11 @@ function calculate(){
         }
         document.getElementById("closure").innerText=text;
     }
-    saveData();
-}
-
-// 匯出
-function exportXLSX(){
-    let site=document.getElementById("siteName").value||"水準測量資料";
-    let rows=document.querySelectorAll("#dataTable tbody tr");
-    let data=[["點位","TP","BS","FS","高程"]];
-    rows.forEach(row=>{
-        data.push([
-            row.cells[0].querySelector("input").value,
-            row.cells[1].querySelector("input").checked?"TP":"",
-            row.cells[2].querySelector("input").value,
-            row.cells[3].querySelector("input").value,
-            row.cells[4].innerText
-        ]);
-    });
-    let ws=XLSX.utils.aoa_to_sheet(data);
-    let wb=XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb,ws,"資料");
-    XLSX.writeFile(wb,site+".xlsx");
-}
-
-// 教學
-function showHelp(){
-    alert(`使用教學：
-
-1️⃣ 閉合水準：
-   已知BM → 測點 → 回到已知BM
-   系統會計算 ΣBS、ΣFS 與閉合差。
-   （白話版本：BM出發，回到BM）
-
-2️⃣ 附合水準：
-   起點填假設高程，最後輸入已知BM，
-   系統會檢核閉合差。
-   （白話版本：任意點出發，BM結束）
-
-3️⃣ 相對高程：
-   不需BM，只計算各點高程。
-   （白話版本：沒有BM）
-
-操作流程：
-輸入起始高程（已知）與BS（BM讀值） → 新增點位 → 填FS（若該點將作為轉點需勾選TP）
-若前一點為TP輸入下一點輸入BS → 按計算。
-
-本系統會自動儲存資料，關閉頁面不會消失。`);
-}
-
-// 自動儲存
-function saveData(){
-    localStorage.setItem("surveyData", document.body.innerHTML);
-}
-
-// 讀取資料
-window.onload=function(){
-    let data=localStorage.getItem("surveyData");
-    if(data){
-        document.body.innerHTML=data;
-    }
-}
-
-// 清空
-function clearAll(){
-    if(confirm("確定清空所有資料？")){
-        localStorage.clear();
-        location.reload();
-    }
-}
-  
-// ======================
-// 附加功能：保持資料 + 點位排序 + Excel檔名自動加字
-// ======================
-
-let originalOrder = [];
-let sortedAsc = false;
-
-// 儲存 table 與必要欄位
-function saveEnhancedData(){
-    let rows=document.querySelectorAll("#dataTable tbody tr");
-    let data=[];
-    rows.forEach(row=>{
-        data.push([
-            row.cells[0].querySelector("input").value,
-            row.cells[1].querySelector("input").checked,
-            row.cells[2].querySelector("input").value,
-            row.cells[3].querySelector("input").value,
-            row.cells[4].innerText
-        ]);
-    });
-    localStorage.setItem("surveyTable", JSON.stringify(data));
-
-    // 其他欄位
-    ["bm1","bm1bs","bm2","tolerance","siteName","mode"].forEach(id=>{
-        let el=document.getElementById(id);
-        if(el) localStorage.setItem(id, el.value);
-    });
-}
-
-// 還原資料
-function loadEnhancedData(){
-    let tableData = localStorage.getItem("surveyTable");
-    if(tableData){
-        let rows = JSON.parse(tableData);
-        let tbody=document.querySelector("#dataTable tbody");
-        tbody.innerHTML="";
-        rows.forEach(r=>{
-            let row = tbody.insertRow();
-            row.innerHTML=`
-                <td><input value="${r[0]}" oninput="saveEnhancedData()"></td>
-                <td><input type="checkbox" ${r[1] ? "checked" : ""} onchange="saveEnhancedData()"></td>
-                <td><input type="text" inputmode="decimal" pattern="[0-9]*" value="${r[2]}" oninput="saveEnhancedData()"></td>
-                <td><input type="text" inputmode="decimal" pattern="[0-9]*" value="${r[3]}" oninput="saveEnhancedData()"></td>
-                <td>${r[4]}</td>`;
-        });
-    }
-
-    // 還原其他欄位
-    ["bm1","bm1bs","bm2","tolerance","siteName","mode"].forEach(id=>{
-        let val=localStorage.getItem(id);
-        if(val!==null) document.getElementById(id).value=val;
-    });
-}
-
-// 點位排序
-let originalOrder = [];
-let sortedAsc = false;
-
-// 儲存表格資料
-function saveEnhancedData(){
-    let rows=document.querySelectorAll("#dataTable tbody tr");
-    let data=[];
-    rows.forEach(row=>{
-        data.push([
-            row.cells[0].querySelector("input").value,
-            row.cells[1].querySelector("input").checked,
-            row.cells[2].querySelector("input").value,
-            row.cells[3].querySelector("input").value,
-            row.cells[4].innerText
-        ]);
-    });
-    localStorage.setItem("surveyTable", JSON.stringify(data));
-
-    ["bm1","bm1bs","bm2","tolerance","siteName","mode"].forEach(id=>{
-        let el=document.getElementById(id);
-        if(el) localStorage.setItem(id, el.value);
-    });
-}
-
-// 還原資料
-function loadEnhancedData(){
-    let tableData = localStorage.getItem("surveyTable");
-    if(tableData){
-        let rows = JSON.parse(tableData);
-        let tbody=document.querySelector("#dataTable tbody");
-        tbody.innerHTML="";
-        rows.forEach(r=>{
-            let row = tbody.insertRow();
-            row.innerHTML=`
-                <td><input value="${r[0]}" oninput="saveEnhancedData()"></td>
-                <td><input type="checkbox" ${r[1] ? "checked" : ""} onchange="saveEnhancedData()"></td>
-                <td><input type="text" inputmode="decimal" pattern="[0-9]*" value="${r[2]}" oninput="saveEnhancedData()"></td>
-                <td><input type="text" inputmode="decimal" pattern="[0-9]*" value="${r[3]}" oninput="saveEnhancedData()"></td>
-                <td>${r[4]}</td>`;
-        });
-    }
-
-    ["bm1","bm1bs","bm2","tolerance","siteName","mode"].forEach(id=>{
-        let val=localStorage.getItem(id);
-        if(val!==null) document.getElementById(id).value=val;
-    });
-}
-
-// 排序函式
-function sortPoints(){
-    let tbody = document.querySelector("#dataTable tbody");
-
-    if(!originalOrder.length){
-        originalOrder = Array.from(tbody.querySelectorAll("tr"))
-            .map(row => row.cloneNode(true));
-    }
-
-    if(sortedAsc){
-        tbody.innerHTML="";
-        originalOrder.forEach(row => tbody.appendChild(row.cloneNode(true)));
-        sortedAsc=false;
-    } else {
-        let rows = Array.from(tbody.querySelectorAll("tr"));
-        rows.sort((a, b)=>{
-            let pa = a.cells[0].querySelector("input").value.toUpperCase();
-            let pb = b.cells[0].querySelector("input").value.toUpperCase();
-            let matchA = pa.match(/^(\d+)?([A-Z]+)?-?(\d+)?$/);
-            let matchB = pb.match(/^(\d+)?([A-Z]+)?-?(\d+)?$/);
-            let numA = matchA[1]?parseInt(matchA[1]):0;
-            let secA = matchA[2]||pa;
-            let suffixA = matchA[3]?parseInt(matchA[3]):0;
-            let numB = matchB[1]?parseInt(matchB[1]):0;
-            let secB = matchB[2]||pb;
-            let suffixB = matchB[3]?parseInt(matchB[3]):0;
-            if(numA!==numB) return numA-numB;
-            if(secA!==secB) return secA.localeCompare(secB);
-            return suffixA-suffixB;
-        });
-
-        let frag=document.createDocumentFragment();
-        rows.forEach(row=>{
-            let newRow=row.cloneNode(true);
-            newRow.cells[0].querySelector("input").oninput=saveEnhancedData;
-            newRow.cells[1].querySelector("input").onchange=saveEnhancedData;
-            newRow.cells[2].querySelector("input").oninput=saveEnhancedData;
-            newRow.cells[3].querySelector("input").oninput=saveEnhancedData;
-            frag.appendChild(newRow);
-        });
-
-        tbody.innerHTML="";
-        tbody.appendChild(frag);
-        sortedAsc=true;
-    }
     saveEnhancedData();
 }
 
-// 綁定排序按鈕
-window.addEventListener("load", ()=>{
-    loadEnhancedData();
-
-    let th = document.querySelector("#dataTable thead tr th:first-child");
-    if(th && !document.getElementById("sortBtnEnhanced")){
-        let sortedAsc = false;
-
-function sortPoints(){
-    let tbody = document.querySelector("#dataTable tbody");
-    // ... 排序邏輯保持不變 ...
-
-    // 切換箭頭
-    let btn = document.getElementById("sortBtnEnhanced");
-    btn.innerHTML = sortedAsc ? "&#9660;" : "&#9650;"; // ▲升序 ▼降序
-    sortedAsc = !sortedAsc;
-}
-    }
-});
-
-// Excel 匯出自動加「水準測量」
-let originalExport = exportXLSX;
-exportXLSX = function(){
+// 匯出 Excel
+function exportXLSX(){
     let site=document.getElementById("siteName").value||"工地";
     let rows=document.querySelectorAll("#dataTable tbody tr");
     let data=[["點位","TP","BS","FS","高程"]];
@@ -392,8 +155,121 @@ exportXLSX = function(){
     XLSX.utils.book_append_sheet(wb,ws,"資料");
     XLSX.writeFile(wb, site+" 水準測量.xlsx");
 }
+
+// 使用教學
+function showHelp(){
+    alert(`使用教學：
+
+1️⃣ 閉合水準：
+   已知BM → 測點 → 回到已知BM
+   系統會計算 ΣBS、ΣFS 與閉合差。
+2️⃣ 附合水準：
+   起點填假設高程，最後輸入已知BM，系統會檢核閉合差。
+3️⃣ 相對高程：
+   不需BM，只計算各點高程。
+操作流程：
+輸入起始高程與BS → 新增點位 → 填FS（若為轉點需勾選TP） → 按計算。
+本系統會自動儲存資料，關閉頁面不會消失。`);
+}
+
+// ======================
+// 本地儲存
+// ======================
+function saveEnhancedData(){
+    let rows=document.querySelectorAll("#dataTable tbody tr");
+    let data=[];
+    rows.forEach(row=>{
+        data.push([
+            row.cells[0].querySelector("input").value,
+            row.cells[1].querySelector("input").checked,
+            row.cells[2].querySelector("input").value,
+            row.cells[3].querySelector("input").value,
+            row.cells[4].innerText
+        ]);
+    });
+    localStorage.setItem("surveyTable", JSON.stringify(data));
+    ["bm1","bm1bs","bm2","tolerance","siteName","mode"].forEach(id=>{
+        let el=document.getElementById(id);
+        if(el) localStorage.setItem(id, el.value);
+    });
+}
+
+function loadEnhancedData(){
+    let tableData = localStorage.getItem("surveyTable");
+    if(tableData){
+        let rows = JSON.parse(tableData);
+        let tbody=document.querySelector("#dataTable tbody");
+        tbody.innerHTML="";
+        rows.forEach(r=>{
+            let row = tbody.insertRow();
+            row.innerHTML=`
+                <td><input value="${r[0]}"></td>
+                <td><input type="checkbox" ${r[1] ? "checked" : ""}></td>
+                <td><input type="text" inputmode="decimal" value="${r[2]}"></td>
+                <td><input type="text" inputmode="decimal" value="${r[3]}"></td>
+                <td>${r[4]}</td>`;
+        });
+    }
+    ["bm1","bm1bs","bm2","tolerance","siteName","mode"].forEach(id=>{
+        let val=localStorage.getItem(id);
+        if(val!==null) document.getElementById(id).value=val;
+    });
+}
+
+// ======================
+// 點位排序
+// ======================
+function sortPoints(){
+    let tbody = document.querySelector("#dataTable tbody");
+    if(!originalOrder.length){
+        originalOrder = Array.from(tbody.querySelectorAll("tr")).map(r => r.cloneNode(true));
+    }
+
+    if(sortedAsc){
+        let rows = Array.from(tbody.querySelectorAll("tr"));
+        rows.sort((a,b)=>{
+            let pa=a.cells[0].querySelector("input").value.toUpperCase();
+            let pb=b.cells[0].querySelector("input").value.toUpperCase();
+            let matchA=pa.match(/^(\d+)?([A-Z]+)?-?(\d+)?$/);
+            let matchB=pb.match(/^(\d+)?([A-Z]+)?-?(\d+)?$/);
+            let numA=matchA[1]?parseInt(matchA[1]):0;
+            let secA=matchA[2]||pa;
+            let suffixA=matchA[3]?parseInt(matchA[3]):0;
+            let numB=matchB[1]?parseInt(matchB[1]):0;
+            let secB=matchB[2]||pb;
+            let suffixB=matchB[3]?parseInt(matchB[3]):0;
+            if(numA!==numB) return numA-numB;
+            if(secA!==secB) return secA.localeCompare(secB);
+            return suffixA-suffixB;
+        });
+        tbody.innerHTML="";
+        rows.forEach(row=>tbody.appendChild(row.cloneNode(true)));
+        sortedAsc=false;
+        document.getElementById("sortBtn").innerHTML="&#9660;";
+    } else {
+        tbody.innerHTML="";
+        originalOrder.forEach(r=>tbody.appendChild(r.cloneNode(true)));
+        sortedAsc=true;
+        document.getElementById("sortBtn").innerHTML="&#9650;";
+    }
+    saveEnhancedData();
+}
+
+// ======================
+// 綁定事件
+// ======================
+window.addEventListener("load", ()=>{
+    loadEnhancedData();
+    document.getElementById("addRowBtn").addEventListener("click", addRow);
+    document.getElementById("calculateBtn").addEventListener("click", calculate);
+    document.getElementById("exportBtn").addEventListener("click", exportXLSX);
+    document.getElementById("helpBtn").addEventListener("click", showHelp);
+    document.getElementById("clearBtn").addEventListener("click", ()=>{
+        if(confirm("確定清空所有資料？")){ localStorage.clear(); location.reload(); }
+    });
+    document.getElementById("sortBtn").addEventListener("click", sortPoints);
+});
 </script>
-  
 
 </body>
 </html>
