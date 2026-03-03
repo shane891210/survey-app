@@ -256,64 +256,119 @@ function loadEnhancedData(){
 }
 
 // 點位排序
-function saveOriginalOrder(){
-    originalOrder = Array.from(document.querySelectorAll("#dataTable tbody tr"))
-        .map(row => row.cloneNode(true));
+let originalOrder = [];
+let sortedAsc = false;
+
+// 儲存表格資料
+function saveEnhancedData(){
+    let rows=document.querySelectorAll("#dataTable tbody tr");
+    let data=[];
+    rows.forEach(row=>{
+        data.push([
+            row.cells[0].querySelector("input").value,
+            row.cells[1].querySelector("input").checked,
+            row.cells[2].querySelector("input").value,
+            row.cells[3].querySelector("input").value,
+            row.cells[4].innerText
+        ]);
+    });
+    localStorage.setItem("surveyTable", JSON.stringify(data));
+
+    ["bm1","bm1bs","bm2","tolerance","siteName","mode"].forEach(id=>{
+        let el=document.getElementById(id);
+        if(el) localStorage.setItem(id, el.value);
+    });
 }
 
+// 還原資料
+function loadEnhancedData(){
+    let tableData = localStorage.getItem("surveyTable");
+    if(tableData){
+        let rows = JSON.parse(tableData);
+        let tbody=document.querySelector("#dataTable tbody");
+        tbody.innerHTML="";
+        rows.forEach(r=>{
+            let row = tbody.insertRow();
+            row.innerHTML=`
+                <td><input value="${r[0]}" oninput="saveEnhancedData()"></td>
+                <td><input type="checkbox" ${r[1] ? "checked" : ""} onchange="saveEnhancedData()"></td>
+                <td><input type="text" inputmode="decimal" pattern="[0-9]*" value="${r[2]}" oninput="saveEnhancedData()"></td>
+                <td><input type="text" inputmode="decimal" pattern="[0-9]*" value="${r[3]}" oninput="saveEnhancedData()"></td>
+                <td>${r[4]}</td>`;
+        });
+    }
+
+    ["bm1","bm1bs","bm2","tolerance","siteName","mode"].forEach(id=>{
+        let val=localStorage.getItem(id);
+        if(val!==null) document.getElementById(id).value=val;
+    });
+}
+
+// 排序函式
 function sortPoints(){
-    let tbody=document.querySelector("#dataTable tbody");
+    let tbody = document.querySelector("#dataTable tbody");
 
     if(!originalOrder.length){
         originalOrder = Array.from(tbody.querySelectorAll("tr"))
             .map(row => row.cloneNode(true));
     }
 
-    if(sortedAsc){ 
-        tbody.innerHTML = "";
+    if(sortedAsc){
+        tbody.innerHTML="";
         originalOrder.forEach(row => tbody.appendChild(row.cloneNode(true)));
         sortedAsc=false;
-    } else { 
+    } else {
         let rows = Array.from(tbody.querySelectorAll("tr"));
-        rows.sort((a, b) => {
+        rows.sort((a, b)=>{
             let pa = a.cells[0].querySelector("input").value.toUpperCase();
             let pb = b.cells[0].querySelector("input").value.toUpperCase();
             let matchA = pa.match(/^(\d+)?([A-Z]+)?-?(\d+)?$/);
             let matchB = pb.match(/^(\d+)?([A-Z]+)?-?(\d+)?$/);
-            let numA = matchA[1] ? parseInt(matchA[1]) : 0;
-            let secA = matchA[2] || pa;
-            let suffixA = matchA[3] ? parseInt(matchA[3]) : 0;
-            let numB = matchB[1] ? parseInt(matchB[1]) : 0;
-            let secB = matchB[2] || pb;
-            let suffixB = matchB[3] ? parseInt(matchB[3]) : 0;
+            let numA = matchA[1]?parseInt(matchA[1]):0;
+            let secA = matchA[2]||pa;
+            let suffixA = matchA[3]?parseInt(matchA[3]):0;
+            let numB = matchB[1]?parseInt(matchB[1]):0;
+            let secB = matchB[2]||pb;
+            let suffixB = matchB[3]?parseInt(matchB[3]):0;
             if(numA!==numB) return numA-numB;
             if(secA!==secB) return secA.localeCompare(secB);
             return suffixA-suffixB;
         });
 
-        // 先 clone 再 append，不破壞原事件
         let frag=document.createDocumentFragment();
-        rows.forEach(row=>frag.appendChild(row.cloneNode(true)));
-        tbody.innerHTML = "";
+        rows.forEach(row=>{
+            let newRow=row.cloneNode(true);
+            newRow.cells[0].querySelector("input").oninput=saveEnhancedData;
+            newRow.cells[1].querySelector("input").onchange=saveEnhancedData;
+            newRow.cells[2].querySelector("input").oninput=saveEnhancedData;
+            newRow.cells[3].querySelector("input").oninput=saveEnhancedData;
+            frag.appendChild(newRow);
+        });
+
+        tbody.innerHTML="";
         tbody.appendChild(frag);
         sortedAsc=true;
     }
-
     saveEnhancedData();
 }
 
-// 重新綁定排序按鈕
-window.addEventListener("load",()=>{
+// 綁定排序按鈕
+window.addEventListener("load", ()=>{
     loadEnhancedData();
-    // 在表格標題加排序按鈕
+
     let th = document.querySelector("#dataTable thead tr th:first-child");
     if(th && !document.getElementById("sortBtnEnhanced")){
-        let btn = document.createElement("button");
-        btn.id="sortBtnEnhanced";
-        btn.textContent="排序";
-        btn.style.marginLeft="4px";
-        btn.onclick=sortPoints;
-        th.appendChild(btn);
+        let sortedAsc = false;
+
+function sortPoints(){
+    let tbody = document.querySelector("#dataTable tbody");
+    // ... 排序邏輯保持不變 ...
+
+    // 切換箭頭
+    let btn = document.getElementById("sortBtnEnhanced");
+    btn.innerHTML = sortedAsc ? "&#9660;" : "&#9650;"; // ▲升序 ▼降序
+    sortedAsc = !sortedAsc;
+}
     }
 });
 
