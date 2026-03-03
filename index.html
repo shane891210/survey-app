@@ -268,7 +268,21 @@ function sortPoints(){
 // 綁定排序按鈕
 window.addEventListener("load", ()=>{
     loadEnhancedData();
-    document.getElementById("sortBtn").onclick=sortPoints;
+
+    let th = document.querySelector("#dataTable thead tr th:first-child");
+    if(th && !document.getElementById("sortBtnEnhanced")){
+        let btn = document.createElement("button");
+        btn.id = "sortBtnEnhanced";
+        btn.innerHTML = "&#9650;"; // 初始為小箭頭 ▲
+        btn.style.fontSize = "14px";  // 小字
+        btn.style.padding = "2px 6px"; // 小按鈕，不占整列
+        btn.style.marginLeft = "4px";
+        btn.onclick = function(){
+            sortPoints();
+            btn.innerHTML = sortedAsc ? "&#9660;" : "&#9650;"; // 切換箭頭
+        };
+        th.appendChild(btn);
+    }
 });
 </script>
 
