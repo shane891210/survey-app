@@ -4,16 +4,17 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>恆億工程水準測量計算器</title>
-
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#1976d2">
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 
 <style>
 body { font-family: Arial; padding: 12px; background:#f4f4f4; }
 h2 { text-align:center; }
-input { width:100%; padding:8px; margin:4px 0; font-size:16px; }
+input, select { width:100%; padding:10px; margin:6px 0; font-size:18px; }
 table { width:100%; border-collapse: collapse; margin-top:10px; background:white;}
-th, td { border:1px solid #ccc; padding:6px; text-align:center; font-size:14px; }
-button { width:100%; padding:12px; margin-top:8px; font-size:16px; }
+th, td { border:1px solid #ccc; padding:8px; text-align:center; font-size:16px; }
+button { width:100%; padding:14px; margin-top:8px; font-size:18px; }
 .result { background:#eef; font-weight:bold; }
 .warning { color:red; font-weight:bold; }
 </style>
@@ -23,29 +24,32 @@ button { width:100%; padding:12px; margin-top:8px; font-size:16px; }
 
 <h2>恆億工程水準測量計算器</h2>
 
+<label>測線模式</label>
+<select id="mode" onchange="saveData()">
+<option value="closed">閉合水準（BM→BM）</option>
+<option value="attach">附合水準（未知→BM）</option>
+<option value="relative">相對高程（無BM）</option>
+</select>
+
 <label>工地名稱</label>
-<input type="text" id="siteName" placeholder="輸入工地名稱">
+<input type="text" id="siteName" placeholder="輸入工地名稱" oninput="saveData()">
 
-<label>BM1 高程</label>
-<input type="number" id="bm1" step="0.001">
+<label>起始高程</label>
+<input type="text" inputmode="decimal" pattern="[0-9]*" id="bm1" oninput="saveData()">
 
-<label>BM1 BS</label>
-<input type="number" id="bm1bs" step="0.001">
+<label>起始BS</label>
+<input type="text" inputmode="decimal" pattern="[0-9]*" id="bm1bs" oninput="saveData()">
 
-<label>BM2 高程（選填）</label>
-<input type="number" id="bm2" step="0.001">
+<label>終點BM高程（若有）</label>
+<input type="text" inputmode="decimal" pattern="[0-9]*" id="bm2" oninput="saveData()">
 
 <label>容許閉合差 (mm)</label>
-<input type="number" id="tolerance" value="10">
+<input type="text" inputmode="decimal" pattern="[0-9]*" id="tolerance" value="10" oninput="saveData()">
 
 <table id="dataTable">
 <thead>
 <tr>
-<th>點位</th>
-<th>TP</th>
-<th>BS</th>
-<th>FS</th>
-<th>高程</th>
+<th>點位</th><th>TP</th><th>BS</th><th>FS</th><th>高程</th>
 </tr>
 </thead>
 <tbody></tbody>
@@ -53,35 +57,44 @@ button { width:100%; padding:12px; margin-top:8px; font-size:16px; }
 
 <button onclick="addRow()">新增點位</button>
 <button onclick="calculate()">計算</button>
+<button onclick="exportXLSX()">匯出 Excel</button>
+<button onclick="showHelp()">使用教學</button>
 <button onclick="clearAll()">清空資料</button>
-<button onclick="exportXLSX()">匯出 Excel (.xlsx)</button>
 
 <h3 id="closure"></h3>
 
 <script>
-// 新增列
-function addRow(){
-    let table=document.querySelector("#dataTable tbody");
-    let row=table.insertRow();
-    row.innerHTML=`
-        <td><input></td>
-        <td><input type="checkbox"></td>
-        <td><input type="number" step="0.001"></td>
-        <td><input type="number" step="0.001"></td>
-        <td class="result"></td>
-    `;
+// 註冊 service worker
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('service-worker.js');
 }
 
-// 計算高程
+// 新增列
+function addRow(){
+    let row=document.querySelector("#dataTable tbody").insertRow();
+    row.innerHTML=`
+    <td><input oninput="saveData()"></td>
+    <td><input type="checkbox" onchange="saveData()"></td>
+    <td><input type="text" inputmode="decimal" pattern="[0-9]*" oninput="saveData()"></td>
+    <td><input type="text" inputmode="decimal" pattern="[0-9]*" oninput="saveData()"></td>
+    <td></td>`;
+    saveData();
+}
+
+// 計算
 function calculate(){
+    let mode=document.getElementById("mode").value;
     let bm1=parseFloat(document.getElementById("bm1").value);
     let bm1bs=parseFloat(document.getElementById("bm1bs").value);
     let bm2=parseFloat(document.getElementById("bm2").value);
     let tolerance=parseFloat(document.getElementById("tolerance").value);
-    if(isNaN(bm1)||isNaN(bm1bs)){ alert("請輸入BM1高程與BS"); return; }
+
+    if(isNaN(bm1)||isNaN(bm1bs)){ alert("請輸入起始高程與BS"); return; }
 
     let HI=bm1+bm1bs;
     let lastTP=bm1;
+    let sumBS=bm1bs;
+    let sumFS=0;
     let rows=document.querySelectorAll("#dataTable tbody tr");
 
     rows.forEach(row=>{
@@ -89,61 +102,98 @@ function calculate(){
         let bs=parseFloat(row.cells[2].querySelector("input").value);
         let fs=parseFloat(row.cells[3].querySelector("input").value);
 
-        if(!isNaN(bs)){ HI=lastTP+bs; }
+        if(!isNaN(bs)){
+            HI=lastTP+bs;
+            sumBS+=bs;
+        }
         if(!isNaN(fs)){
             let elevation=HI-fs;
             row.cells[4].innerText=elevation.toFixed(3);
+            sumFS+=fs;
             if(isTP){ lastTP=elevation; }
         }
     });
 
-    if(!isNaN(bm2)&&rows.length>0){
-        let lastRow=rows[rows.length-1];
-        let finalElevation=parseFloat(lastRow.cells[4].innerText);
-        if(!isNaN(finalElevation)){
-            let closure=(finalElevation-bm2)*1000;
-            let text="閉合差 = "+closure.toFixed(1)+" mm";
-            if(Math.abs(closure)>tolerance){ text+=" ⚠ 超過容許值"; document.getElementById("closure").className="warning"; }
-            else{ document.getElementById("closure").className=""; }
-            document.getElementById("closure").innerText=text;
-        }
-    }
+    if(mode!="relative" && !isNaN(bm2)){
+        let closure=(sumBS-sumFS)-(bm2-bm1);
+        let text="ΣBS="+sumBS.toFixed(3)+"  ΣFS="+sumFS.toFixed(3);
+        text+="  閉合差="+(closure*1000).toFixed(1)+" mm";
 
-    // 只存表格內容
-    localStorage.setItem("surveyDataTable", document.querySelector("#dataTable tbody").innerHTML);
+        if(Math.abs(closure*1000)>tolerance){
+            text+=" ⚠ 超過容許值";
+            document.getElementById("closure").className="warning";
+        } else {
+            document.getElementById("closure").className="";
+        }
+        document.getElementById("closure").innerText=text;
+    }
+    saveData();
 }
 
-// 清空資料
+// 匯出
+function exportXLSX(){
+    let site=document.getElementById("siteName").value||"水準測量資料";
+    let rows=document.querySelectorAll("#dataTable tbody tr");
+    let data=[["點位","TP","BS","FS","高程"]];
+    rows.forEach(row=>{
+        data.push([
+            row.cells[0].querySelector("input").value,
+            row.cells[1].querySelector("input").checked?"TP":"",
+            row.cells[2].querySelector("input").value,
+            row.cells[3].querySelector("input").value,
+            row.cells[4].innerText
+        ]);
+    });
+    let ws=XLSX.utils.aoa_to_sheet(data);
+    let wb=XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb,ws,"資料");
+    XLSX.writeFile(wb,site+".xlsx");
+}
+
+// 教學
+function showHelp(){
+    alert(`使用教學：
+
+1️⃣ 閉合水準：
+   已知BM → 測點 → 回到已知BM
+   系統會計算 ΣBS、ΣFS 與閉合差。
+   （白話版本：BM出發，回到BM）
+
+2️⃣ 附合水準：
+   起點填假設高程，最後輸入已知BM，
+   系統會檢核閉合差。
+   （白話版本：任意點出發，BM結束）
+
+3️⃣ 相對高程：
+   不需BM，只計算各點高程。
+   （白話版本：沒有BM）
+
+操作流程：
+輸入起始高程（已知）與BS（BM讀值） → 新增點位 → 填FS（若該點將作為轉點需勾選TP）
+若前一點為TP輸入下一點輸入BS → 按計算。
+
+本系統會自動儲存資料，關閉頁面不會消失。`);
+}
+
+// 自動儲存
+function saveData(){
+    localStorage.setItem("surveyData", document.body.innerHTML);
+}
+
+// 讀取資料
+window.onload=function(){
+    let data=localStorage.getItem("surveyData");
+    if(data){
+        document.body.innerHTML=data;
+    }
+}
+
+// 清空
 function clearAll(){
     if(confirm("確定清空所有資料？")){
         localStorage.clear();
         location.reload();
     }
-}
-
-// 匯出 Excel
-function exportXLSX(){
-    let siteName = document.getElementById("siteName").value || "水準測量資料";
-    let rows=document.querySelectorAll("#dataTable tbody tr");
-    let data=[["點位","TP","BS","FS","高程"]];
-    rows.forEach(row=>{
-        let point=row.cells[0].querySelector("input").value;
-        let tp=row.cells[1].querySelector("input").checked?"TP":"";
-        let bs=row.cells[2].querySelector("input").value;
-        let fs=row.cells[3].querySelector("input").value;
-        let ele=row.cells[4].innerText;
-        data.push([point,tp,bs,fs,ele]);
-    });
-    let ws=XLSX.utils.aoa_to_sheet(data);
-    let wb=XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb,ws,"沉陷資料");
-    XLSX.writeFile(wb, siteName + ".xlsx");
-}
-
-// 讀取 localStorage 只恢復表格內容
-window.onload=function(){
-    let data=localStorage.getItem("surveyDataTable");
-    if(data){ document.querySelector("#dataTable tbody").innerHTML=data; }
 }
 </script>
 
