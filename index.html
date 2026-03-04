@@ -270,17 +270,15 @@ window.addEventListener("load",()=>{
 });
 
 // Excel 匯出自動加「水準測量」
-function exportXLSX() {
-
-    let site = document.getElementById("siteName").value || "工地";
-    let rows = document.querySelectorAll("#dataTable tbody tr");
-
-    let data = [["點位","TP","BS","FS","高程"]];
+function exportXLSX(){
+    let site=document.getElementById("siteName").value||"工地";
+    let rows=document.querySelectorAll("#dataTable tbody tr");
+    let data=[["點位","TP","BS","FS","高程"]];
 
     rows.forEach(row=>{
         data.push([
             row.cells[0].querySelector("input").value,
-            row.cells[1].querySelector("input").checked ? "TP" : "",
+            row.cells[1].querySelector("input").checked?"TP":"",
             row.cells[2].querySelector("input").value,
             row.cells[3].querySelector("input").value,
             row.cells[4].innerText
@@ -291,19 +289,21 @@ function exportXLSX() {
     let wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "資料");
 
-    const wbout = XLSX.write(wb, { bookType: "xlsx", type: "array" });
-    const blob = new Blob([wbout], { 
-        type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" 
-    });
+    // 使用 XLSX.write 產生二進位字串
+    let wbout = XLSX.write(wb, {bookType:'xlsx', type:'array'});
+    let blob = new Blob([wbout], {type:"application/octet-stream"});
 
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
+    // 建立臨時下載連結
+    let url = URL.createObjectURL(blob);
+    let a = document.createElement("a");
     a.href = url;
     a.download = site + " 水準測量.xlsx";
     document.body.appendChild(a);
     a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+    setTimeout(()=>{
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+    }, 100);
 }
 
 // 清空
