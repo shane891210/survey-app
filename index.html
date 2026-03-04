@@ -270,8 +270,7 @@ window.addEventListener("load",()=>{
 });
 
 // Excel 匯出自動加「水準測量」
-let originalExport = exportXLSX;
-exportXLSX = function() {
+function exportXLSX() {
 
     let site = document.getElementById("siteName").value || "工地";
     let rows = document.querySelectorAll("#dataTable tbody tr");
@@ -292,9 +291,10 @@ exportXLSX = function() {
     let wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "資料");
 
-    // 🔥 改用手機穩定下載方式
     const wbout = XLSX.write(wb, { bookType: "xlsx", type: "array" });
-    const blob = new Blob([wbout], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+    const blob = new Blob([wbout], { 
+        type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" 
+    });
 
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
@@ -304,7 +304,7 @@ exportXLSX = function() {
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
-};
+}
 
 // 清空
 function clearAll(){
