@@ -271,24 +271,40 @@ window.addEventListener("load",()=>{
 
 // Excel 匯出自動加「水準測量」
 let originalExport = exportXLSX;
-exportXLSX = function(){
-    let site=document.getElementById("siteName").value||"工地";
-    let rows=document.querySelectorAll("#dataTable tbody tr");
-    let data=[["點位","TP","BS","FS","高程"]];
+exportXLSX = function() {
+
+    let site = document.getElementById("siteName").value || "工地";
+    let rows = document.querySelectorAll("#dataTable tbody tr");
+
+    let data = [["點位","TP","BS","FS","高程"]];
+
     rows.forEach(row=>{
         data.push([
             row.cells[0].querySelector("input").value,
-            row.cells[1].querySelector("input").checked?"TP":"",
+            row.cells[1].querySelector("input").checked ? "TP" : "",
             row.cells[2].querySelector("input").value,
             row.cells[3].querySelector("input").value,
             row.cells[4].innerText
         ]);
     });
-    let ws=XLSX.utils.aoa_to_sheet(data);
-    let wb=XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb,ws,"資料");
-    XLSX.writeFile(wb, site+" 水準測量.xlsx");
-}
+
+    let ws = XLSX.utils.aoa_to_sheet(data);
+    let wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "資料");
+
+    // 🔥 改用手機穩定下載方式
+    const wbout = XLSX.write(wb, { bookType: "xlsx", type: "array" });
+    const blob = new Blob([wbout], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = site + " 水準測量.xlsx";
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+};
 
 // 清空
 function clearAll(){
