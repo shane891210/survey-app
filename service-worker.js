@@ -1,5 +1,5 @@
 // service-worker.js
-const CACHE_NAME = "survey-pwa-v6";  // 每次更新版本要改這個名稱
+const CACHE_NAME = "survey-pwa-v7";  // 每次更新版本要改這個名稱
 
 const urlsToCache = [
   "./",
