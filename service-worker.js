@@ -1,4 +1,4 @@
-const CACHE_NAME = "survey-pwa-v2";  // ← 每次更新版本改這個數字
+const CACHE_NAME = "survey-pwa-v3";  // ← 每次更新版本改這個數字
 
 const urlsToCache = [
   "./",
